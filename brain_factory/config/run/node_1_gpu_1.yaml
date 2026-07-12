@@ -1,0 +1,5 @@
+_target_: brain_factory.scaffold.runner.RunConfig
+device: gpu
+num_nodes: 1
+num_gpus: 1
+seed: 42

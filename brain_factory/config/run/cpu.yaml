@@ -1,0 +1,4 @@
+_target_: brain_factory.scaffold.runner.RunConfig
+device: cpu
+num_cores: 1
+seed: 42

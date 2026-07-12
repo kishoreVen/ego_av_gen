@@ -1,0 +1,20 @@
+# brain_factory base config — single Hydra entry point
+# Usage: python -m brain_factory.main projects=dummy/training/dummy
+
+defaults:
+  - /run: node_1_gpu_1
+  - /projects: ???
+  - _self_
+
+run:
+  output_dir: ${datetime_dir:./brain_factory_out/${.experiment_name}}
+  experiment_name: default
+  resume_using: null
+
+hydra:
+  run:
+    dir: ${run.output_dir}
+  job_logging:
+    handlers:
+      file:
+        filename: ${hydra.run.dir}/pipeline.log

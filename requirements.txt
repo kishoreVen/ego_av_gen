@@ -1,0 +1,29 @@
+# Core ML
+torch>=2.7
+numpy
+Pillow
+safetensors
+transformers
+diffusers
+opencv-python
+
+# Config / data
+hydra-core
+omegaconf
+dacite
+
+# Model provider SDKs
+anthropic
+openai
+google-genai
+google-auth
+google-api-python-client
+google-auth-httplib2
+elevenlabs
+together
+runware
+
+# HTTP / retry / parsing utils
+requests
+tenacity
+json-repair

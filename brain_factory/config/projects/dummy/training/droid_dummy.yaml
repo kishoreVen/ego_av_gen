@@ -1,0 +1,48 @@
+#
+# Test recipe: DroidDataset wired to the dummy model + dummy loss so you can
+# verify data loading end-to-end before a real VLA model is hooked up.
+#
+# Run from the repo root:
+#   python -m brain_factory.main projects=dummy/training/droid_dummy
+#
+# Adjust data_dir to whichever dataset is available:
+#   data/droid_100   — 100-episode subset (default)
+#   data/droid       — full dataset (still downloading)
+_target_: brain_factory.projects.dummy.dummy_recipe.DummyTrainingRecipe
+config:
+  _target_: brain_factory.scaffold.training_recipe_base.TrainerRecipeConfigBase
+  recipe_name: droid_dummy
+
+  dataset:
+    _target_: brain_factory.dataset.droid_dataset.DroidDataset
+    data_dir: data/droid_100   # switch to data/droid once it finishes downloading
+    split: train
+    image_size: null           # null = keep native 180x320; set [H, W] to resize
+    max_episodes: 5            # keep small for a quick smoke test; null = all episodes
+
+  umbrella_model:
+    _target_: brain_factory.model.dummy_model.DummyUmbrellaModel
+    input_dim: 16
+    hidden_dim: 32
+    num_classes: 2
+
+  loss_gatherer:
+    _target_: brain_factory.scaffold.loss_gatherer.LossGatherer
+    losses:
+      ce_loss:
+        _target_: brain_factory.scaffold.loss_gatherer.LossTermConfig
+        loss:
+          _target_: brain_factory.loss.dummy_loss.DummyCrossEntropyLoss
+        weight_schedule:
+          _target_: brain_factory.weight_schedule.constant.ConstantWeightSchedule
+          weight: 1.0
+
+  train_monitor:
+    _target_: brain_factory.scaffold.monitor.Monitor
+    log_loss_interval: 10
+    tb_loss_interval: 10
+    checkpoint_interval: 0
+    output_save_interval: 0
+
+  max_steps: 50
+  learning_rate: 0.001

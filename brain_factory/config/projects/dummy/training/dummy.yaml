@@ -1,0 +1,31 @@
+_target_: brain_factory.projects.dummy.dummy_recipe.DummyTrainingRecipe
+config:
+  _target_: brain_factory.scaffold.training_recipe_base.TrainerRecipeConfigBase
+  recipe_name: dummy_training
+  dataset:
+    _target_: brain_factory.dataset.dummy_dataset.DummyDataset
+    num_samples: 100
+    input_dim: 16
+  umbrella_model:
+    _target_: brain_factory.model.dummy_model.DummyUmbrellaModel
+    input_dim: 16
+    hidden_dim: 32
+    num_classes: 2
+  loss_gatherer:
+    _target_: brain_factory.scaffold.loss_gatherer.LossGatherer
+    losses:
+      ce_loss:
+        _target_: brain_factory.scaffold.loss_gatherer.LossTermConfig
+        loss:
+          _target_: brain_factory.loss.dummy_loss.DummyCrossEntropyLoss
+        weight_schedule:
+          _target_: brain_factory.weight_schedule.constant.ConstantWeightSchedule
+          weight: 1.0
+  train_monitor:
+    _target_: brain_factory.scaffold.monitor.Monitor
+    log_loss_interval: 10
+    tb_loss_interval: 10
+    checkpoint_interval: 0
+    output_save_interval: 0
+  max_steps: 50
+  learning_rate: 0.001
