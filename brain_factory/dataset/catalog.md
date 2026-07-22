@@ -40,6 +40,9 @@ app capture session (`data_collector/object_recorder`), flattening frames
 across all of the session's recordings (ARKit and/or Max FPS) into a single
 indexable sequence.
 
+A session is captures of one physical object, so every item carries
+`object_name` identifying which one.
+
 Keys present on every item:
 
 | key | type/shape | notes |
@@ -47,6 +50,7 @@ Keys present on every item:
 | `image` | `float32` `(H, W, 3)`, `[0,1]` | decoded from `video.mov`, matched to this frame by presentation **timestamp** (not `frame_index` — video and metadata frames aren't guaranteed 1:1). Native resolution unless `image_size` is passed to the constructor. |
 | `intrinsics` | `float32` `(3, 3)` | zero-filled if this frame didn't carry one (observed on some Max FPS frames) |
 | `has_intrinsics` | `bool` | whether `intrinsics` above is real or zero-filled |
+| `object_name` | `str` | the session's name (`label` in `session_manifest.json`, falling back to the session folder name for older sessions) — the object being captured, same for every item in the dataset instance |
 | `mode` | `str` | `"arkit"` or `"maxfps"` |
 | `recording_name` | `str` | e.g. `"01_arkit"` — which recording in the session this frame is from |
 | `frame_index` | `int64` | frame's index within its recording |

@@ -119,6 +119,11 @@ class ObjectRecorderSessionDataset(DatasetBase):
             02_maxfps/
                 ...
 
+    A session is captures of one physical object, so every item also carries
+    `object_name` -- the name given at "New Session" time (`label` in
+    session_manifest.json), falling back to the session folder name for
+    older sessions that predate that field.
+
     Schema notes:
     - `intrinsics` is always present (zero-filled + `has_intrinsics=False`
       when the underlying frame didn't carry one -- observed to happen for
@@ -154,7 +159,7 @@ class ObjectRecorderSessionDataset(DatasetBase):
         super().__init__(use_cache=use_cache)
         self._session_dir = Path(session_dir)
         self._image_size = image_size
-        self._recordings: List[_RecordingIndex] = self._load_recordings(modes)
+        self._object_name, self._recordings = self._load_session(modes)
         self._flat_index: List[Tuple[int, int]] = [
             (rec_idx, local_idx)
             for rec_idx, rec in enumerate(self._recordings)
@@ -168,10 +173,16 @@ class ObjectRecorderSessionDataset(DatasetBase):
             (depth_recordings[0].depth_height, depth_recordings[0].depth_width) if depth_recordings else None
         )
 
-    def _load_recordings(self, modes: Optional[Sequence[str]]) -> List[_RecordingIndex]:
+    def _load_session(self, modes: Optional[Sequence[str]]) -> Tuple[str, List[_RecordingIndex]]:
         manifest_path = self._session_dir / "session_manifest.json"
         with open(manifest_path) as f:
             session_manifest = json.load(f)
+
+        # A session is captures of one physical object; the label the user
+        # gave it at "New Session" time is the object's identity. Older
+        # session_manifest.json files (predating that field) don't have it,
+        # so fall back to the session folder name -- e.g. "aa_battery".
+        object_name = session_manifest.get("label") or self._session_dir.name
 
         recordings = []
         for entry in session_manifest["recordings"]:
@@ -180,7 +191,11 @@ class ObjectRecorderSessionDataset(DatasetBase):
             recordings.append(_RecordingIndex(self._session_dir / entry["name"], entry["name"], entry["mode"]))
         if not recordings:
             raise ValueError(f"No recordings found under {self._session_dir} (modes={modes})")
-        return recordings
+        return object_name, recordings
+
+    @property
+    def object_name(self) -> str:
+        return self._object_name
 
     def __len__(self) -> int:
         return len(self._flat_index)
@@ -199,6 +214,7 @@ class ObjectRecorderSessionDataset(DatasetBase):
             "image": torch.from_numpy(image.astype(np.float32) / 255.0),
             "intrinsics": self._matrix_or_zero(frame.get("intrinsics"), (3, 3)),
             "has_intrinsics": torch.tensor(frame.get("intrinsics") is not None),
+            "object_name": self._object_name,
             "mode": rec.mode,
             "recording_name": rec.name,
             "frame_index": torch.tensor(frame["frame_index"], dtype=torch.int64),
