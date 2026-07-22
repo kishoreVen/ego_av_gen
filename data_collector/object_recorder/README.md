@@ -4,6 +4,18 @@ Very simple iOS app for collecting object-capture data (video + camera
 calibration + depth) on iPhone. Built for iPhone 15 Pro Max (LiDAR) but
 degrades gracefully on non-LiDAR devices.
 
+The app opens on a **sessions list** — every past capture session, newest
+first. From there, name a new session (e.g. the object you're about to
+capture — required, so sessions stay identifiable) and tap **New Session**
+to jump into the camera screen;
+record as many ARKit and/or Max FPS clips as you want (switching modes
+freely between them), then tap **End Session** to return to the list. The
+name is folded into the session's folder name and shown in the list so you
+can tell sessions apart. Tapping a past session in the list opens a
+read-only detail view of its recordings — sessions can't be resumed, only
+started fresh. Swipe a session left to delete it (and its recordings) from
+the phone.
+
 Two capture modes, picked with the segmented control at the top:
 
 - **ARKit** — video + per-frame intrinsics + extrinsics (full 6-DoF camera
@@ -31,16 +43,24 @@ your device, and run.
 
 ## Output format
 
-Each recording writes a timestamped session folder to the app's Documents
-directory (visible via the Files app → On My iPhone → Object Recorder, or
-`xcrun devicectl` / Xcode's Devices window):
+**New Session** creates one timestamped session folder (prefixed with the
+name you gave it) in the app's Documents directory (visible via the Files
+app → On My iPhone → Object Recorder, or `xcrun devicectl` / Xcode's
+Devices window); every recording made before the matching **End Session**
+lands in its own numbered subfolder inside it:
 
 ```
-session_<mode>_<yyyyMMdd_HHmmss>/
-  video.mov         # HEVC (ARKit mode) or H.264 (Max FPS mode)
-  manifest.json      # mode, resolution, fps, depth/extrinsics availability
-  frames.jsonl        # one JSON object per captured frame (see below)
-  raw/                # binary depth/confidence dumps referenced from frames.jsonl
+session_<name>_<yyyyMMdd_HHmmss>/
+  session_manifest.json          # list of this session's recordings (name, mode)
+  01_arkit_<yyyyMMdd_HHmmss>/
+    video.mov         # HEVC (ARKit mode) or H.264 (Max FPS mode)
+    manifest.json      # mode, resolution, fps, depth/extrinsics availability
+    frames.jsonl        # one JSON object per captured frame (see below)
+    raw/                # binary depth/confidence dumps referenced from frames.jsonl
+  02_maxfps_<yyyyMMdd_HHmmss>/
+    video.mov
+    manifest.json
+    frames.jsonl
 ```
 
 `frames.jsonl` — one line per frame, tightly packed row-major matrices:
@@ -74,7 +94,13 @@ so its Documents folder is exposed without any extra app code:
 
 ## Notes
 
-- No live preview overlay beyond the raw camera feed — kept intentionally
-  minimal.
-- Recording state (mode, start/stop) resets between runs; nothing is
-  persisted across app launches except the written session folders.
+- The live camera feed starts as soon as camera access is granted (not just
+  once you hit record), so you can frame the shot before starting a
+  recording; switching the mode picker between ARKit/Max FPS swaps which
+  camera session is active. No preview overlay beyond the raw feed — kept
+  intentionally minimal.
+- Recording state (mode, start/stop, active session, typed-in name) resets
+  between app runs; nothing is persisted across launches except the written
+  session folders. The sessions list is rebuilt from those folders (and
+  their `session_manifest.json`) each time it appears, so it's always in
+  sync with what's actually on disk.

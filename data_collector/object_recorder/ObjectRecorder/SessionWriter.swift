@@ -10,10 +10,11 @@ final class SessionWriter {
     private var manifest: [String: Any] = [:]
     private let framesFileHandle: FileHandle
 
-    init(mode: String) {
-        let docs = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        let name = "session_\(mode)_\(Self.timestampString())"
-        sessionURL = docs.appendingPathComponent(name)
+    /// - Parameters:
+    ///   - parentURL: the enclosing capture session's folder.
+    ///   - name: this recording's subfolder name within it.
+    init(parentURL: URL, name: String) {
+        sessionURL = parentURL.appendingPathComponent(name)
         rawDir = sessionURL.appendingPathComponent("raw")
         try? FileManager.default.createDirectory(at: rawDir, withIntermediateDirectories: true)
 

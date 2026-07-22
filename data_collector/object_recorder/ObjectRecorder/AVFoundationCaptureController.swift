@@ -38,6 +38,7 @@ final class AVFoundationCaptureController: NSObject, ObservableObject, AVCapture
     private var frameIndex = 0
     private var sessionStarted = false
     private var configured = false
+    private var isPreviewRunning = false
 
     func configureIfNeeded() {
         guard !configured else { return }
@@ -87,34 +88,52 @@ final class AVFoundationCaptureController: NSObject, ObservableObject, AVCapture
         activeFPS = choice.range.maxFrameRate
     }
 
-    func start() {
-        guard !isRecording else { return }
+    /// Starts the capture session for a live camera feed without recording
+    /// anything. Safe to call repeatedly; a no-op once already running.
+    func startPreview() {
         configureIfNeeded()
+        guard !isPreviewRunning, !session.isRunning else { return }
+        isPreviewRunning = true
+        outputQueue.async { [session] in session.startRunning() }
+    }
 
-        writer = SessionWriter(mode: "maxfps")
+    /// Stops the capture session's camera feed. No-ops while recording so
+    /// the mode picker (which drives this via view teardown) can't cut a
+    /// recording short.
+    func stopPreview() {
+        guard isPreviewRunning, !isRecording else { return }
+        isPreviewRunning = false
+        outputQueue.async { [session] in session.stopRunning() }
+    }
+
+    func start(in captureSession: CaptureSession) {
+        guard !isRecording else { return }
+        startPreview()
+
+        let name = captureSession.nextRecordingName(mode: "maxfps")
+        writer = SessionWriter(parentURL: captureSession.url, name: name)
+        captureSession.registerRecording(name: name, mode: "maxfps")
         frameIndex = 0
         sessionStarted = false
         assetWriter = nil
         isRecording = true
         status = "Recording (Max FPS)\u{2026}"
-
-        if !session.isRunning {
-            outputQueue.async { [session] in session.startRunning() }
-        }
     }
 
-    func stop() {
+    func stop(onFinished: (() -> Void)? = nil) {
         guard isRecording else { return }
         isRecording = false
+        // Session keeps running (unlike before) so the live preview
+        // continues between recordings within the same capture session.
 
         videoInput?.markAsFinished()
         assetWriter?.finishWriting { [weak self] in
             DispatchQueue.main.async {
                 self?.writer?.finish()
                 self?.status = "Saved: \(self?.writer?.sessionURL.lastPathComponent ?? "")"
+                onFinished?()
             }
         }
-        outputQueue.async { [session] in session.stopRunning() }
     }
 
     func captureOutput(_ output: AVCaptureOutput, didOutput sampleBuffer: CMSampleBuffer, from connection: AVCaptureConnection) {

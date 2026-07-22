@@ -20,13 +20,16 @@ final class ARKitCaptureController: NSObject, ObservableObject, ARSessionDelegat
     private var sessionStartTime: TimeInterval?
     private var frameIndex = 0
     private var didWriteDepthInfo = false
+    private var isPreviewRunning = false
 
     /// Separate handle onto the physical back camera purely to read live
     /// exposure/white-balance/ISO state while ARKit owns the capture session.
     private let backCamera = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: .back)
 
-    func start() {
-        guard !isRecording, ARWorldTrackingConfiguration.isSupported else { return }
+    /// Runs the AR session for a live camera feed without recording anything.
+    /// Safe to call repeatedly; a no-op once the preview is already running.
+    func startPreview() {
+        guard !isPreviewRunning, ARWorldTrackingConfiguration.isSupported else { return }
 
         let config = ARWorldTrackingConfiguration()
         if let bestFormat = ARWorldTrackingConfiguration.supportedVideoFormats.max(by: {
@@ -43,8 +46,25 @@ final class ARKitCaptureController: NSObject, ObservableObject, ARSessionDelegat
 
         session.delegate = self
         session.run(config, options: [.resetTracking, .removeExistingAnchors])
+        isPreviewRunning = true
+    }
 
-        writer = SessionWriter(mode: "arkit")
+    /// Pauses the AR session's camera feed. No-ops while recording so the
+    /// mode picker (which drives this via view teardown) can't cut a
+    /// recording short.
+    func stopPreview() {
+        guard isPreviewRunning, !isRecording else { return }
+        session.pause()
+        isPreviewRunning = false
+    }
+
+    func start(in captureSession: CaptureSession) {
+        guard !isRecording, ARWorldTrackingConfiguration.isSupported else { return }
+        startPreview()
+
+        let name = captureSession.nextRecordingName(mode: "arkit")
+        writer = SessionWriter(parentURL: captureSession.url, name: name)
+        captureSession.registerRecording(name: name, mode: "arkit")
         frameIndex = 0
         sessionStartTime = nil
         assetWriter = nil
@@ -53,16 +73,18 @@ final class ARKitCaptureController: NSObject, ObservableObject, ARSessionDelegat
         status = "Recording (ARKit)\u{2026}"
     }
 
-    func stop() {
+    func stop(onFinished: (() -> Void)? = nil) {
         guard isRecording else { return }
         isRecording = false
-        session.pause()
+        // Session keeps running (unlike before) so the live preview
+        // continues between recordings within the same capture session.
 
         videoInput?.markAsFinished()
         assetWriter?.finishWriting { [weak self] in
             DispatchQueue.main.async {
                 self?.writer?.finish()
                 self?.status = "Saved: \(self?.writer?.sessionURL.lastPathComponent ?? "")"
+                onFinished?()
             }
         }
     }
