@@ -122,7 +122,9 @@ class ObjectRecorderSessionDataset(DatasetBase):
     A session is captures of one physical object, so every item also carries
     `object_name` -- the name given at "New Session" time (`label` in
     session_manifest.json), falling back to the session folder name for
-    older sessions that predate that field.
+    older sessions that predate that field. Pass `object_name` explicitly to
+    override both (e.g. from a training recipe config, to normalize/rename
+    without touching data on disk).
 
     Schema notes:
     - `intrinsics` is always present (zero-filled + `has_intrinsics=False`
@@ -154,12 +156,14 @@ class ObjectRecorderSessionDataset(DatasetBase):
         session_dir: str,
         modes: Optional[Sequence[str]] = None,
         image_size: Optional[Tuple[int, int]] = None,
+        object_name: Optional[str] = None,
         use_cache: bool = False,
     ) -> None:
         super().__init__(use_cache=use_cache)
         self._session_dir = Path(session_dir)
         self._image_size = image_size
-        self._object_name, self._recordings = self._load_session(modes)
+        derived_object_name, self._recordings = self._load_session(modes)
+        self._object_name = object_name if object_name else derived_object_name
         self._flat_index: List[Tuple[int, int]] = [
             (rec_idx, local_idx)
             for rec_idx, rec in enumerate(self._recordings)
