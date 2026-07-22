@@ -6,6 +6,11 @@ safetensors
 transformers
 diffusers
 opencv-python
+einops
+trimesh
+
+# Differentiable rasterization (mesh rendering); requires a CUDA toolchain to build
+nvdiffrast
 
 # Config / data
 hydra-core
