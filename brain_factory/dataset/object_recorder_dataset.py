@@ -120,11 +120,11 @@ class ObjectRecorderSessionDataset(DatasetBase):
                 ...
 
     A session is captures of one physical object, so every item also carries
-    `object_name` -- the name given at "New Session" time (`label` in
-    session_manifest.json), falling back to the session folder name for
-    older sessions that predate that field. Pass `object_name` explicitly to
-    override both (e.g. from a training recipe config, to normalize/rename
-    without touching data on disk).
+    `object_name` -- required, not inferred. Callers (including training
+    recipe configs) must state explicitly which object a session is, rather
+    than trusting `session_manifest.json`'s `label` or the session folder
+    name, since a wrong/missing object identity silently corrupts anything
+    trained per-object.
 
     Schema notes:
     - `intrinsics` is always present (zero-filled + `has_intrinsics=False`
@@ -154,16 +154,19 @@ class ObjectRecorderSessionDataset(DatasetBase):
     def __init__(
         self,
         session_dir: str,
+        object_name: str,
         modes: Optional[Sequence[str]] = None,
         image_size: Optional[Tuple[int, int]] = None,
-        object_name: Optional[str] = None,
         use_cache: bool = False,
     ) -> None:
+        if not object_name or not object_name.strip():
+            raise ValueError("object_name is required and can't be blank -- state which object this session is.")
+
         super().__init__(use_cache=use_cache)
         self._session_dir = Path(session_dir)
         self._image_size = image_size
-        derived_object_name, self._recordings = self._load_session(modes)
-        self._object_name = object_name if object_name else derived_object_name
+        self._object_name = object_name
+        self._recordings: List[_RecordingIndex] = self._load_recordings(modes)
         self._flat_index: List[Tuple[int, int]] = [
             (rec_idx, local_idx)
             for rec_idx, rec in enumerate(self._recordings)
@@ -177,16 +180,10 @@ class ObjectRecorderSessionDataset(DatasetBase):
             (depth_recordings[0].depth_height, depth_recordings[0].depth_width) if depth_recordings else None
         )
 
-    def _load_session(self, modes: Optional[Sequence[str]]) -> Tuple[str, List[_RecordingIndex]]:
+    def _load_recordings(self, modes: Optional[Sequence[str]]) -> List[_RecordingIndex]:
         manifest_path = self._session_dir / "session_manifest.json"
         with open(manifest_path) as f:
             session_manifest = json.load(f)
-
-        # A session is captures of one physical object; the label the user
-        # gave it at "New Session" time is the object's identity. Older
-        # session_manifest.json files (predating that field) don't have it,
-        # so fall back to the session folder name -- e.g. "aa_battery".
-        object_name = session_manifest.get("label") or self._session_dir.name
 
         recordings = []
         for entry in session_manifest["recordings"]:
@@ -195,7 +192,7 @@ class ObjectRecorderSessionDataset(DatasetBase):
             recordings.append(_RecordingIndex(self._session_dir / entry["name"], entry["name"], entry["mode"]))
         if not recordings:
             raise ValueError(f"No recordings found under {self._session_dir} (modes={modes})")
-        return object_name, recordings
+        return recordings
 
     @property
     def object_name(self) -> str:
