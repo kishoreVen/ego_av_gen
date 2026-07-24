@@ -38,16 +38,16 @@ install_requirements() {
 }
 
 install_git_deps() {
-    local DEPS_DIR="$SCRIPT_DIR/.deps"
-    mkdir -p "$DEPS_DIR"
+    local THIRD_PARTY_DIR="$SCRIPT_DIR/third_party"
+    mkdir -p "$THIRD_PARTY_DIR"
 
     # SAM3 (requires Python 3.12+, PyTorch 2.7+, CUDA 12.6+)
-    if [ ! -d "$DEPS_DIR/sam3" ]; then
+    if [ ! -d "$THIRD_PARTY_DIR/sam3" ]; then
         echo "Cloning SAM3..."
-        git clone https://github.com/facebookresearch/sam3.git "$DEPS_DIR/sam3"
+        git clone https://github.com/facebookresearch/sam3.git "$THIRD_PARTY_DIR/sam3"
     fi
     echo "Installing SAM3..."
-    uv pip install --python "$VENV_DIR/bin/python" -e "$DEPS_DIR/sam3"
+    uv pip install --python "$VENV_DIR/bin/python" -e "$THIRD_PARTY_DIR/sam3"
 }
 
 main() {

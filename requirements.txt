@@ -7,6 +7,8 @@ transformers
 diffusers
 opencv-python
 einops
+pycocotools
+psutil
 trimesh
 
 # Differentiable rasterization (mesh rendering); requires a CUDA toolchain to build

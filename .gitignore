@@ -228,6 +228,7 @@ yarn-error.log*
 
 # Setup-cloned third-party deps (see setup.sh)
 .deps/
+third_party/
 
 # Scene Generation
 scene_gen_out/*
