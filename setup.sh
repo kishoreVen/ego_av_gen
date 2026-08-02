@@ -27,7 +27,7 @@ create_venv() {
         esac
     fi
     echo "Creating Python ${PYTHON_VERSION} venv with uv at ${VENV_DIR}..."
-    uv venv "$VENV_DIR" --python "$PYTHON_VERSION" --prompt scene_gen
+    uv venv "$VENV_DIR" --python "$PYTHON_VERSION" --prompt ego_av_gen
     echo "Venv created."
 }
 
