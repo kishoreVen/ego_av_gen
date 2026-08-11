@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VLM Camera Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #1a1a1e; color: #e0e0e0; font-family: 'Courier New', monospace; font-size: 12px; height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+
+    #app { display: flex; flex: 1; overflow: hidden; }
+
+    /* ── Left: 3D scene ── */
+    #scene-col { flex: 0 0 60%; display: flex; flex-direction: column; }
+    #three-wrap { flex: 1; position: relative; }
+    #three-canvas { display: block; width: 100%; height: 100%; }
+    #controls-bar {
+      padding: 8px 12px; background: #111115; border-top: 1px solid #333;
+      display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+    }
+    button {
+      padding: 6px 14px; border: none; border-radius: 4px; cursor: pointer;
+      font-family: inherit; font-size: 11px; font-weight: bold; letter-spacing: 0.5px;
+    }
+    #compute-btn { background: #3b7cf5; color: #fff; }
+    #compute-btn:disabled { background: #2a2a3a; color: #555; cursor: default; }
+    #snapshot-btn { background: #2ea84c; color: #fff; }
+    #snapshot-btn:disabled { background: #2a2a3a; color: #555; cursor: default; }
+    #clear-snap-btn { background: #b83030; color: #fff; display: none; }
+    #status { color: #888; flex: 1; text-align: right; }
+    #snap-indicator {
+      padding: 3px 8px; border-radius: 3px; background: #2ea84c22;
+      border: 1px solid #2ea84c; color: #2ea84c; display: none;
+    }
+
+    /* ── Right: panels ── */
+    #right-col { flex: 1; display: flex; flex-direction: column; border-left: 1px solid #333; overflow-y: auto; }
+
+    .panel { border-bottom: 1px solid #2a2a2a; padding: 8px; }
+    .panel-title {
+      font-size: 10px; text-transform: uppercase; letter-spacing: 1px;
+      color: #666; margin-bottom: 6px; display: flex; align-items: center; gap: 8px;
+    }
+    .panel-title .badge {
+      background: #3b7cf522; border: 1px solid #3b7cf5; color: #3b7cf5;
+      padding: 1px 5px; border-radius: 3px; font-size: 9px;
+    }
+
+    /* render-target panel */
+    #render-panel { position: relative; }
+    #render-canvas-wrap { position: relative; display: inline-block; }
+    #render-canvas { display: block; image-rendering: pixelated; }
+    #snap-canvas { position: absolute; top: 0; left: 0; opacity: 0.45; display: none; pointer-events: none; }
+
+    /* embedding mode toggle */
+    .toggle-row { display: flex; gap: 6px; margin-bottom: 6px; }
+    .toggle-btn { padding: 3px 10px; background: #222; border: 1px solid #444; border-radius: 3px; cursor: pointer; color: #888; font-family: inherit; font-size: 11px; }
+    .toggle-btn.active { background: #3b7cf522; border-color: #3b7cf5; color: #3b7cf5; }
+
+    /* scatter canvases */
+    .scatter-row { display: flex; gap: 6px; }
+    .scatter-wrap { flex: 1; }
+    .scatter-label { font-size: 9px; color: #555; text-align: center; margin-bottom: 2px; }
+    canvas { border-radius: 3px; }
+
+    /* similarity panel */
+    #sim-wrap { position: relative; display: inline-block; }
+    #sim-canvas { display: block; image-rendering: pixelated; }
+
+    input[type=range] { accent-color: #3b7cf5; cursor: pointer; }
+
+    /* object patch legend */
+    #obj-legend { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+    .obj-chip {
+      padding: 2px 6px; border-radius: 3px; font-size: 9px; border: 1px solid transparent;
+    }
+
+    /* loading overlay */
+    #loading-overlay {
+      display: none; position: fixed; inset: 0; background: #0009;
+      align-items: center; justify-content: center; z-index: 100;
+      font-size: 16px; color: #fff; flex-direction: column; gap: 12px;
+    }
+    #loading-overlay.show { display: flex; }
+    .spinner { width: 36px; height: 36px; border: 3px solid #444; border-top-color: #3b7cf5; border-radius: 50%; animation: spin 0.8s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Zoom modal ── */
+    #zoom-modal {
+      display: none; position: fixed; inset: 0; background: #000d;
+      z-index: 200; align-items: center; justify-content: center;
+      flex-direction: column; gap: 10px; cursor: zoom-out;
+    }
+    #zoom-modal.show { display: flex; }
+    #zoom-img {
+      max-width: 92vw; max-height: 88vh;
+      image-rendering: pixelated; border-radius: 6px;
+      box-shadow: 0 0 40px #0008;
+    }
+    #zoom-title { color: #999; font-size: 11px; letter-spacing: 1.5px; text-transform: uppercase; }
+    #zoom-hint  { color: #444; font-size: 10px; }
+    .zoomable { cursor: zoom-in; }
+    .zoomable:hover { outline: 1px solid #3b7cf555; }
+  </style>
+</head>
+<body>
+
+<div id="zoom-modal">
+  <div id="zoom-title"></div>
+  <img id="zoom-img" src="" alt="">
+  <div id="zoom-hint">click or press Esc to close</div>
+</div>
+
+<div id="loading-overlay">
+  <div class="spinner"></div>
+  <span id="loading-msg">Waiting for model to load...</span>
+</div>
+
+<div id="app">
+  <!-- Left: 3D scene -->
+  <div id="scene-col">
+    <div id="three-wrap">
+      <canvas id="three-canvas"></canvas>
+    </div>
+    <div id="controls-bar">
+      <button id="compute-btn" disabled>Compute Embeddings</button>
+      <button id="snapshot-btn" disabled>Snapshot</button>
+      <button id="clear-snap-btn">Clear Snapshot</button>
+      <span id="snap-indicator">● Snapshot active</span>
+      <label style="display:flex;align-items:center;gap:5px;color:#aaa;">
+        X <input type="range" id="cam-x" min="-1.2" max="1.2" step="0.02" value="0" style="width:100px;">
+        <span id="cam-x-val">0.00</span>
+      </label>
+      <label style="display:flex;align-items:center;gap:5px;color:#aaa;">
+        Z <input type="range" id="cam-z" min="-0.8" max="0.8" step="0.02" value="0" style="width:80px;">
+        <span id="cam-z-val">0.00</span>
+      </label>
+      <span id="status">Connecting to server...</span>
+    </div>
+  </div>
+
+  <!-- Right: visualization panels -->
+  <div id="right-col">
+
+    <!-- Render target + patch grid -->
+    <div class="panel" id="render-panel">
+      <div class="panel-title">
+        Render Target — What PaliGemma Sees
+        <span class="badge" id="grid-badge">16×16 patches</span>
+      </div>
+      <div style="display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;">
+        <div>
+          <div class="scatter-label">Current (+ patches)</div>
+          <div id="render-canvas-wrap">
+            <canvas id="render-canvas" width="256" height="256"></canvas>
+            <canvas id="snap-canvas"   width="256" height="256"></canvas>
+          </div>
+        </div>
+        <div>
+          <div class="scatter-label">Patch PCA-RGB coloring</div>
+          <canvas id="patch-color-canvas" width="256" height="256"></canvas>
+        </div>
+      </div>
+    </div>
+
+    <!-- Object→patch legend -->
+    <div class="panel" style="padding:6px 8px;">
+      <div class="panel-title">Object → Patch Map</div>
+      <div id="obj-legend"><span style="color:#444">compute embeddings to populate</span></div>
+    </div>
+
+    <!-- Embedding space -->
+    <div class="panel">
+      <div class="panel-title">
+        Embedding Space
+        <span class="badge" id="emb-badge">—</span>
+      </div>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="toggle-siglip">SigLIP patches</button>
+        <button class="toggle-btn" id="toggle-proj">Projected (Gemma)</button>
+      </div>
+      <div class="scatter-row">
+        <div class="scatter-wrap">
+          <div class="scatter-label">PCA 2D — patch thumbnails</div>
+          <canvas id="pca-canvas" width="380" height="380" style="width:100%;max-width:380px;"></canvas>
+        </div>
+        <div class="scatter-wrap">
+          <div class="scatter-label">t-SNE 2D — patch thumbnails</div>
+          <canvas id="tsne-canvas" width="380" height="380" style="width:100%;max-width:380px;"></canvas>
+        </div>
+      </div>
+      <div style="margin-top:6px; font-size:9px; color:#555;">
+        Each square = actual image patch at its embedding position.
+        Colored border = object patch. &nbsp; Faded = snapshot overlay (when active).
+      </div>
+    </div>
+
+    <!-- Cosine similarity heatmap -->
+    <div class="panel">
+      <div class="panel-title">
+        Cosine Similarity vs Snapshot
+        <span class="badge" id="sim-badge">no snapshot</span>
+      </div>
+      <div class="toggle-row">
+        <button class="toggle-btn active" id="sim-spatial-btn" title="Compare patch i now vs patch i at snapshot — misleading after camera offset">Spatial (pos-to-pos)</button>
+        <button class="toggle-btn" id="sim-semantic-btn" title="For each current patch, max cosine sim to ANY snapshot patch — position-invariant">Semantic (nearest patch)</button>
+      </div>
+      <div style="display:flex; gap:8px; align-items:flex-start; flex-wrap:wrap;">
+        <div>
+          <div class="scatter-label">SigLIP space</div>
+          <canvas id="sim-canvas" width="512" height="512" style="width:256px;height:256px;"></canvas>
+        </div>
+        <div>
+          <div class="scatter-label">Projected (Gemma) space</div>
+          <canvas id="sim-proj-canvas" width="512" height="512" style="width:256px;height:256px;"></canvas>
+        </div>
+      </div>
+      <div style="margin-top:6px; font-size:9px; color:#555;">
+        Blue = dissimilar &nbsp; White = neutral &nbsp; Red = similar (cos≈1) &nbsp;|&nbsp;
+        <b style="color:#aaa">Spatial</b>: same screen pos before/after. &nbsp;
+        <b style="color:#aaa">Semantic</b>: best-matching patch anywhere in snapshot (camera-offset-invariant).
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://cdn.jsdelivr.net/npm/three@0.167.1/build/three.module.js",
+    "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.167.1/examples/jsm/"
+  }
+}
+</script>
+<script>
+  window.addEventListener('error', e => {
+    document.getElementById('status').textContent = 'JS ERROR: ' + e.message + ' (' + e.filename?.split('/').pop() + ':' + e.lineno + ')';
+    document.getElementById('status').style.color = '#f55';
+  });
+  window.addEventListener('unhandledrejection', e => {
+    document.getElementById('status').textContent = 'Promise error: ' + e.reason;
+    document.getElementById('status').style.color = '#f55';
+  });
+</script>
+<script type="module" src="/static/app.js"></script>
+</body>
+</html>
