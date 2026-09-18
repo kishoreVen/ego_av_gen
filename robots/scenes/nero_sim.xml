@@ -1,0 +1,213 @@
+<mujoco model="nero_sim">
+
+  <compiler
+    meshdir="/home/kisho/code/ego_av_gen/robots/nero_urdf/nero/meshes"
+    angle="radian"
+    eulerseq="XYZ"/>
+
+  <option gravity="0 0 -9.81" timestep="0.001" iterations="20" solver="Newton"/>
+
+  <visual>
+    <headlight ambient="0.3 0.3 0.3" diffuse="0.6 0.6 0.6" specular="0.2 0.2 0.2"/>
+    <map force="0.1" zfar="30"/>
+    <quality shadowsize="2048"/>
+    <global offwidth="720" offheight="480"/>
+  </visual>
+
+  <asset>
+    <!-- Arm links -->
+    <mesh name="base_link"     file="base_link.stl"/>
+    <mesh name="link1"         file="link1.stl"/>
+    <mesh name="link2"         file="link2.stl"/>
+    <mesh name="link3"         file="link3.stl"/>
+    <mesh name="link4"         file="link4.stl"/>
+    <mesh name="link5"         file="link5.stl"/>
+    <mesh name="link6"         file="link6.stl"/>
+    <mesh name="link7"         file="link7.stl"/>
+    <!-- Gripper -->
+    <mesh name="gripper_flange" file="gripper_flange.stl"/>
+    <mesh name="gripper_base"   file="gripper_base.stl"/>
+    <mesh name="gripper_link1"  file="gripper_link1.stl"/>
+    <mesh name="gripper_link2"  file="gripper_link2.stl"/>
+
+    <material name="robot"     rgba="0.70 0.72 0.78 1"/>
+    <material name="gripper"   rgba="0.20 0.20 0.22 1"/>
+    <material name="floor"     rgba="0.28 0.30 0.34 1" reflectance="0.15"/>
+  </asset>
+
+  <worldbody>
+    <light name="sun" pos="2 2 3" dir="-1 -1 -2" directional="true"
+           diffuse="0.7 0.7 0.7" specular="0.3 0.3 0.3" castshadow="true"/>
+    <light name="fill" pos="-2 1 2" dir="1 -0.5 -1" directional="true"
+           diffuse="0.3 0.3 0.32" specular="0.0 0.0 0.0"/>
+
+    <geom name="floor" type="plane" size="3 3 0.01"
+          material="floor" pos="0 0 0" contype="1" conaffinity="1"/>
+
+    <!-- Small cube target in front of the arm -->
+    <geom name="cube" type="box" size="0.025 0.025 0.025"
+          pos="0.28 0 0.025" rgba="0.95 0.35 0.15 1"
+          contype="1" conaffinity="1" mass="0.05"/>
+
+    <!-- Cameras: Z = X×Y, camera looks along -Z.
+         front/side: X flipped so -Z points toward the robot at origin. -->
+    <camera name="front" pos="0.90 0.0  0.60" xyaxes="0  1 0 -0.268 0 0.964"/>
+    <camera name="side"  pos="0.0  0.90 0.60" xyaxes="-1 0 0  0 -0.268 0.964"/>
+    <camera name="iso"   pos="0.72 0.72 0.70" xyaxes="-0.707 0.707 0 -0.230 -0.230 0.946"/>
+
+    <!-- Robot: base fixed to world -->
+    <body name="base_link" pos="0 0 0">
+      <inertial pos="0 0 0.043" mass="1.065"
+                diaginertia="0.00103 0.00114 0.00091"/>
+      <geom type="mesh" mesh="base_link" material="robot"/>
+
+      <!-- joint1 – yaw of whole arm, z=0.138 above base -->
+      <body name="link1" pos="0 0 0.138">
+        <inertial pos="0 0 -0.007" mass="0.767"
+                  diaginertia="0.000667 0.000545 0.000515"/>
+        <joint name="joint1" type="hinge" axis="0 0 1"
+               range="-2.70526 2.70526" damping="1.0" armature="0.01"/>
+        <geom type="mesh" mesh="link1" material="robot"/>
+
+        <!-- joint2 – shoulder pitch, frame rotated by rpy="π/2 π 0" -->
+        <body name="link2" euler="1.5707963 3.1415926 0">
+          <inertial pos="0 -0.079 0.001" mass="0.694"
+                    diaginertia="0.00201 0.000635 0.00182"/>
+          <joint name="joint2" type="hinge" axis="0 0 1"
+                 range="-1.74 1.74" damping="1.0" armature="0.01"/>
+          <geom type="mesh" mesh="link2" material="robot"/>
+
+          <!-- joint3 – elbow, xyz="0 -0.31 0" rpy="-π/2 0 π" -->
+          <body name="link3" pos="0 -0.31 0" euler="-1.5707963 0 3.1415926">
+            <inertial pos="0 -0.001 -0.049" mass="0.672"
+                      diaginertia="0.00343 0.00339 0.000289"/>
+            <joint name="joint3" type="hinge" axis="0 0 1"
+                   range="-2.75 2.75" damping="0.8" armature="0.01"/>
+            <geom type="mesh" mesh="link3" material="robot"/>
+
+            <!-- joint4 – forearm roll, rpy="-π/2 0 π" -->
+            <body name="link4" euler="-1.5707963 0 3.1415926">
+              <inertial pos="0 -0.057 0.001" mass="0.485"
+                        diaginertia="0.000504 0.000235 0.000401"/>
+              <joint name="joint4" type="hinge" axis="0 0 1"
+                     range="-1.01 2.14" damping="0.8" armature="0.01"/>
+              <geom type="mesh" mesh="link4" material="robot"/>
+
+              <!-- joint5 – wrist pitch, xyz="0 -0.27001 0" rpy="π/2 -π/2 0" -->
+              <body name="link5" pos="0 -0.27001 0" euler="1.5707963 -1.5707963 0">
+                <inertial pos="0.003 0.002 -0.116" mass="0.584"
+                          diaginertia="0.000895 0.000859 0.000218"/>
+                <joint name="joint5" type="hinge" axis="0 0 1"
+                       range="-2.75 2.75" damping="0.5" armature="0.01"/>
+                <geom type="mesh" mesh="link5" material="robot"/>
+
+                <!-- joint6 – wrist roll, rpy="π/2 -π/2 0" -->
+                <body name="link6" euler="1.5707963 -1.5707963 0">
+                  <inertial pos="0 0.001 0" mass="0.314"
+                            diaginertia="0.0000603 0.0000470 0.0000576"/>
+                  <joint name="joint6" type="hinge" axis="0 0 1"
+                         range="-0.73 0.95" damping="0.3" armature="0.01"/>
+                  <geom type="mesh" mesh="link6" material="robot"/>
+
+                  <!-- joint7 – wrist yaw, xyz="0 -0.0235 0" rpy="π/2 0 0" -->
+                  <body name="link7" pos="0 -0.0235 0" euler="1.5707963 0 0">
+                    <inertial pos="0 0 -0.003" mass="0.001"
+                              diaginertia="1.1e-7 1.1e-7 2.0e-7"/>
+                    <joint name="joint7" type="hinge" axis="0 0 1"
+                           range="-1.5707963 1.5707963" damping="0.2" armature="0.01"/>
+                    <geom type="mesh" mesh="link7" material="robot"/>
+
+                    <!-- Gripper flange (fixed), xyz="0.031 0 -0.0235" rpy="-π/2 0 -π/2" -->
+                    <body name="gripper_flange" pos="0.031 0 -0.0235"
+                          euler="-1.5708 0 -1.5708">
+                      <inertial pos="0 0 -0.010" mass="0.048"
+                                diaginertia="3.6e-5 1.8e-5 2.7e-5"/>
+                      <geom type="mesh" mesh="gripper_flange" material="robot"/>
+
+                      <!-- Gripper base (fixed offset 6mm) -->
+                      <body name="gripper_base" pos="0 0 0.006">
+                        <inertial pos="0 0 0.032" mass="0.45"
+                                  diaginertia="0.000929 0.000714 0.000394"/>
+                        <geom type="mesh" mesh="gripper_base" material="gripper"/>
+
+                        <!-- Virtual drive joint (controls opening width 0–100mm) -->
+                        <body name="gripper_drive">
+                          <inertial pos="0 0 0" mass="0.01"
+                                    diaginertia="1e-4 1e-4 1e-4"/>
+                          <joint name="gripper" type="slide" axis="0 0 1"
+                                 range="0 0.1" damping="10.0" armature="0.01"/>
+                        </body>
+
+                        <!-- Left finger: xyz="0 0 0.138" rpy="π/2 0 π" -->
+                        <body name="gripper_link1" pos="0 0 0.138"
+                              euler="1.5707963 0 3.1415926">
+                          <inertial pos="0.001 -0.049 0.010" mass="0.025"
+                                    diaginertia="7.4e-5 7.8e-6 7.5e-5"/>
+                          <joint name="gripper_joint1" type="slide" axis="0 0 1"
+                                 range="0 0.05" damping="2.0" armature="0.001"/>
+                          <geom type="mesh" mesh="gripper_link1" material="gripper"/>
+                        </body>
+
+                        <!-- Right finger: xyz="0 0 0.138" rpy="π/2 0 0" -->
+                        <body name="gripper_link2" pos="0 0 0.138"
+                              euler="1.5707963 0 0">
+                          <inertial pos="0.001 -0.049 0.010" mass="0.025"
+                                    diaginertia="7.4e-5 7.8e-6 7.5e-5"/>
+                          <joint name="gripper_joint2" type="slide" axis="0 0 -1"
+                                 range="-0.05 0" damping="2.0" armature="0.001"/>
+                          <geom type="mesh" mesh="gripper_link2" material="gripper"/>
+                        </body>
+
+                      </body>
+                    </body>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </body>
+        </body>
+      </body>
+    </body>
+
+  </worldbody>
+
+  <!-- Fingers mimic the drive joint (URDF mimic: multiplier=±0.5) -->
+  <equality>
+    <joint name="grip_eq1" joint1="gripper_joint1" joint2="gripper"
+           polycoef="0 0.5 0 0 0"/>
+    <joint name="grip_eq2" joint1="gripper_joint2" joint2="gripper"
+           polycoef="0 -0.5 0 0 0"/>
+  </equality>
+
+  <!-- Position-servo actuators (lower kp for stability with dt=0.001) -->
+  <actuator>
+    <position name="j1" joint="joint1" kp="80" kv="16"
+              ctrllimited="true" ctrlrange="-2.70526 2.70526"/>
+    <position name="j2" joint="joint2" kp="80" kv="16"
+              ctrllimited="true" ctrlrange="-1.74 1.74"/>
+    <position name="j3" joint="joint3" kp="80" kv="16"
+              ctrllimited="true" ctrlrange="-2.75 2.75"/>
+    <position name="j4" joint="joint4" kp="50" kv="10"
+              ctrllimited="true" ctrlrange="-1.01 2.14"/>
+    <position name="j5" joint="joint5" kp="50" kv="10"
+              ctrllimited="true" ctrlrange="-2.75 2.75"/>
+    <position name="j6" joint="joint6" kp="25" kv="5"
+              ctrllimited="true" ctrlrange="-0.73 0.95"/>
+    <position name="j7" joint="joint7" kp="25" kv="5"
+              ctrllimited="true" ctrlrange="-1.5707963 1.5707963"/>
+    <position name="gripper_act" joint="gripper" kp="5" kv="2"
+              ctrllimited="true" ctrlrange="0 0.1"/>
+  </actuator>
+
+  <keyframe>
+    <!-- 10 qpos: joint1-7 | gripper_drive | gripper_joint1 | gripper_joint2
+         Equality constraints: joint1 = 0.5*gripper, joint2 = -0.5*gripper -->
+    <key name="home"  qpos="0 0 0 0 0 0 0 0 0 0"
+         ctrl="0 0 0 0 0 0 0 0"/>
+    <!-- ready: arm reaches diagonally forward, gripper half-open (0.05 m)
+         finger joints satisfy mimic: j1=0.025, j2=-0.025 -->
+    <key name="ready" qpos="0 1.0 0.5 0 0 0 0 0.05 0.025 -0.025"
+         ctrl="0 1.0 0.5 0 0 0 0 0.05"/>
+  </keyframe>
+
+</mujoco>
